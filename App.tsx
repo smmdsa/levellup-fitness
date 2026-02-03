@@ -191,6 +191,26 @@ const App: React.FC = () => {
         }
     });
 
+    const today = new Date().toISOString().split('T')[0];
+    const existingEntryIndex = newAnalytics.history.findIndex(entry => entry.date === today);
+    if (existingEntryIndex >= 0) {
+      const updatedEntry = { ...newAnalytics.history[existingEntryIndex] };
+      updatedEntry.sessionsDone = newDaily.sessionsDone;
+      updatedEntry.xpEarned += earnedXP;
+      newAnalytics.history = newAnalytics.history.map((entry, index) =>
+        index === existingEntryIndex ? updatedEntry : entry
+      );
+    } else {
+      newAnalytics.history = [
+        ...newAnalytics.history,
+        {
+          date: today,
+          sessionsDone: newDaily.sessionsDone,
+          xpEarned: earnedXP
+        }
+      ];
+    }
+
     // 5. Save Everything
     setUser({ ...user, stats: updatedStats });
     setDaily(newDaily);
