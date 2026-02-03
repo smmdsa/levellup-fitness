@@ -19,6 +19,7 @@ export interface User {
   stats: UserStats;
   settings: {
     notificationsEnabled: boolean;
+    sessionsPerDay: number;
   };
 }
 
@@ -36,7 +37,7 @@ export interface Session {
 }
 
 export interface ScheduledSession {
-  sessionId: number; // 1-10
+  sessionId: number;
   targetTime: string; // ISO String
   notificationSent: boolean;
 }
@@ -46,7 +47,7 @@ export interface DailyProgress {
   isCompleted: boolean;
   sessionsDone: number;
   sessions: Session[];
-  schedule: ScheduledSession[]; // List of 10 scheduled times
+  schedule: ScheduledSession[];
 }
 
 export interface HistoryEntry {

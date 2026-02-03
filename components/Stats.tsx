@@ -6,9 +6,10 @@ import { TrendingUp, Activity, Calendar } from 'lucide-react';
 interface StatsProps {
   analytics: AnalyticsData;
   userStats: UserStats;
+  sessionsPerDay: number;
 }
 
-export const Stats: React.FC<StatsProps> = ({ analytics, userStats }) => {
+export const Stats: React.FC<StatsProps> = ({ analytics, userStats, sessionsPerDay }) => {
   // Prepare data for the chart (Last 7 entries)
   const chartData = analytics.history.slice(-7).map(entry => ({
     name: new Date(entry.date).toLocaleDateString(undefined, { weekday: 'short' }),
@@ -79,14 +80,14 @@ export const Stats: React.FC<StatsProps> = ({ analytics, userStats }) => {
                 tickLine={false}
                 axisLine={false}
               />
-              <YAxis hide domain={[0, 10]} />
+              <YAxis hide domain={[0, sessionsPerDay]} />
               <Tooltip 
                 cursor={{fill: '#334155', opacity: 0.4}}
                 contentStyle={{ backgroundColor: '#1e293b', borderColor: '#475569', color: '#f8fafc' }}
               />
               <Bar dataKey="sessions" radius={[4, 4, 0, 0]}>
                 {chartData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.sessions >= 10 ? '#22c55e' : '#6366f1'} />
+                  <Cell key={`cell-${index}`} fill={entry.sessions >= sessionsPerDay ? '#22c55e' : '#6366f1'} />
                 ))}
               </Bar>
             </BarChart>

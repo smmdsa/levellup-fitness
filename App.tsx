@@ -13,6 +13,7 @@ const App: React.FC = () => {
   const [daily, setDaily] = useState<DailyProgress>(dailyProgressRepository.getToday());
   const [analytics, setAnalytics] = useState<AnalyticsData>(analyticsRepository.get());
   const [showLevelUp, setShowLevelUp] = useState(false);
+  const sessionsPerDay = Math.max(1, Math.min(50, Math.floor(user.settings.sessionsPerDay ?? 10)));
 
   // Request Notification Permission on Mount
   useEffect(() => {
@@ -41,7 +42,7 @@ const App: React.FC = () => {
         // Send Notification
         if ('Notification' in window && Notification.permission === 'granted') {
           new Notification(`LevelUp Fitness`, {
-            body: `It's time for Session ${pendingNotification.sessionId}! Drop and give me 10!`,
+            body: `It's time for Session ${pendingNotification.sessionId}! Drop and give me a set!`,
             icon: '/icon.png' // Placeholder, browser will use default if missing
           });
         }
@@ -128,7 +129,7 @@ const App: React.FC = () => {
     const startObj = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes);
 
     const newSchedule: ScheduledSession[] = [];
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < sessionsPerDay; i++) {
       const time = new Date(startObj.getTime() + (i * intervalMinutes * 60 * 1000));
       newSchedule.push({
         sessionId: i + 1,
@@ -149,7 +150,7 @@ const App: React.FC = () => {
   };
 
   const handleLogSession = useCallback((completedExercises: ExerciseItem[]) => {
-    if (daily.sessionsDone >= 10) return;
+    if (daily.sessionsDone >= sessionsPerDay) return;
 
     // 1. Calculate XP
     const earnedXP = Game.calculateSessionXP(user.stats.level);
@@ -169,7 +170,7 @@ const App: React.FC = () => {
     const newDaily = {
       ...daily,
       sessionsDone: newSessionIndex,
-      isCompleted: newSessionIndex === 10,
+      isCompleted: newSessionIndex === sessionsPerDay,
       sessions: [...daily.sessions, sessionDetails]
     };
 
@@ -224,7 +225,43 @@ const App: React.FC = () => {
       setShowLevelUp(true);
       setTimeout(() => setShowLevelUp(false), 3000);
     }
-  }, [daily, user, analytics]);
+  }, [daily, user, analytics, sessionsPerDay]);
+
+  const handleUpdateSessionsPerDay = useCallback((nextCount: number) => {
+    const normalized = Math.max(1, Math.min(50, Math.floor(nextCount)));
+    const newUser = {
+      ...user,
+      settings: {
+        ...user.settings,
+        sessionsPerDay: normalized,
+      }
+    };
+    setUser(newUser);
+    userRepository.set(newUser);
+
+    if (daily.sessionsDone === 0 && daily.schedule.length > 0) {
+      const first = new Date(daily.schedule[0].targetTime);
+      let intervalMinutes = 60;
+      if (daily.schedule.length > 1) {
+        const second = new Date(daily.schedule[1].targetTime);
+        intervalMinutes = Math.max(1, Math.round((second.getTime() - first.getTime()) / 60000));
+      }
+
+      const updatedSchedule: ScheduledSession[] = [];
+      for (let i = 0; i < normalized; i++) {
+        const time = new Date(first.getTime() + (i * intervalMinutes * 60 * 1000));
+        updatedSchedule.push({
+          sessionId: i + 1,
+          targetTime: time.toISOString(),
+          notificationSent: false,
+        });
+      }
+
+      const newDaily = { ...daily, schedule: updatedSchedule };
+      setDaily(newDaily);
+      dailyProgressRepository.set(newDaily);
+    }
+  }, [daily, user]);
 
   return (
     <div className="bg-slate-900 min-h-screen font-sans text-slate-100 selection:bg-indigo-500 selection:text-white">
@@ -247,13 +284,14 @@ const App: React.FC = () => {
             onLogSession={handleLogSession}
             onStartDay={handleStartDay}
             onUpdateSchedule={handleUpdateSchedule}
+            sessionsPerDay={sessionsPerDay}
           />
         )}
         {view === ViewState.STATS && (
-          <Stats analytics={analytics} userStats={user.stats} />
+          <Stats analytics={analytics} userStats={user.stats} sessionsPerDay={sessionsPerDay} />
         )}
         {view === ViewState.PROFILE && (
-          <Profile user={user} />
+          <Profile user={user} onUpdateSessionsPerDay={handleUpdateSessionsPerDay} />
         )}
       </div>
 

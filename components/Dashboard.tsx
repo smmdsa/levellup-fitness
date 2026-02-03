@@ -9,11 +9,12 @@ interface DashboardProps {
   onLogSession: (completedExercises: ExerciseItem[]) => void;
   onStartDay: (startTime: string, intervalMinutes: number) => void;
   onUpdateSchedule: (newSchedule: ScheduledSession[]) => void;
+  sessionsPerDay: number;
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ daily, userStats, onLogSession, onStartDay, onUpdateSchedule }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ daily, userStats, onLogSession, onStartDay, onUpdateSchedule, sessionsPerDay }) => {
   const nextSessionIndex = daily.sessionsDone + 1;
-  const isFinished = daily.sessionsDone >= 10;
+  const isFinished = daily.sessionsDone >= sessionsPerDay;
   
   // -- State for Exercises --
   const [exercises, setExercises] = useState<ExerciseItem[]>([]);
@@ -120,7 +121,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ daily, userStats, onLogSes
         <div className="bg-slate-800 border border-slate-700 p-8 rounded-2xl w-full shadow-2xl text-center">
           <Clock className="w-16 h-16 text-indigo-400 mx-auto mb-4 animate-pulse" />
           <h2 className="text-2xl font-bold text-white mb-2">Initialize Protocol</h2>
-          <p className="text-slate-400 mb-8 text-sm">Configure your 10x10 schedule for today.</p>
+          <p className="text-slate-400 mb-8 text-sm">Configure your {sessionsPerDay} session schedule for today.</p>
 
           <div className="space-y-6 text-left">
             <div>
@@ -173,7 +174,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ daily, userStats, onLogSes
 
       {/* Progress Slots */}
       <div className="grid grid-cols-5 gap-3 mb-6">
-        {Array.from({ length: 10 }).map((_, idx) => {
+        {Array.from({ length: sessionsPerDay }).map((_, idx) => {
           const sessionNum = idx + 1;
           const isCompleted = sessionNum <= daily.sessionsDone;
           const isNext = sessionNum === daily.sessionsDone + 1;
@@ -276,7 +277,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ daily, userStats, onLogSes
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-bold text-white flex items-center">
                 <Dumbbell className="mr-2 text-indigo-400" size={20} />
-                Session {nextSessionIndex}/10
+                Session {nextSessionIndex}/{sessionsPerDay}
               </h2>
               <button 
                 onClick={() => setIsEditingExercises(!isEditingExercises)}
