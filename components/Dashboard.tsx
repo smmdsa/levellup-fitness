@@ -10,9 +10,11 @@ interface DashboardProps {
   onStartDay: (startTime: string, intervalMinutes: number) => void;
   onUpdateSchedule: (newSchedule: ScheduledSession[]) => void;
   sessionsPerDay: number;
+  dayStartHour: number;
+  timeZone?: string;
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ daily, userStats, onLogSession, onStartDay, onUpdateSchedule, sessionsPerDay }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ daily, userStats, onLogSession, onStartDay, onUpdateSchedule, sessionsPerDay, dayStartHour, timeZone }) => {
   const nextSessionIndex = daily.sessionsDone + 1;
   const isFinished = daily.sessionsDone >= sessionsPerDay;
   
@@ -29,6 +31,39 @@ export const Dashboard: React.FC<DashboardProps> = ({ daily, userStats, onLogSes
   const [intervalInput, setIntervalInput] = useState(60);
   const [countdown, setCountdown] = useState<string>('');
   const [isSessionReady, setIsSessionReady] = useState(false);
+  const [dayCountdown, setDayCountdown] = useState<string>('');
+
+  const getTimeZoneOffset = (date: Date, zone: string) => {
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: zone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    });
+
+    const parts = formatter.formatToParts(date);
+    const lookup = (type: string) => parts.find(part => part.type === type)?.value ?? '00';
+    const zonedAsUTC = Date.UTC(
+      Number(lookup('year')),
+      Number(lookup('month')) - 1,
+      Number(lookup('day')),
+      Number(lookup('hour')),
+      Number(lookup('minute')),
+      Number(lookup('second'))
+    );
+
+    return zonedAsUTC - date.getTime();
+  };
+
+  const getZonedDateFromParts = (zone: string, year: number, month: number, day: number, hour: number, minute: number, second: number) => {
+    const utcGuess = Date.UTC(year, month - 1, day, hour, minute, second);
+    const offset = getTimeZoneOffset(new Date(utcGuess), zone);
+    return new Date(utcGuess - offset);
+  };
 
   // Initialize routine when session changes
   useEffect(() => {
@@ -66,6 +101,66 @@ export const Dashboard: React.FC<DashboardProps> = ({ daily, userStats, onLogSes
     const timer = setInterval(tick, 1000);
     return () => clearInterval(timer);
   }, [daily.schedule, nextSessionIndex, isFinished]);
+
+  // Countdown to next training day start
+  useEffect(() => {
+    const tick = () => {
+      const now = new Date();
+      const normalizedStartHour = Math.max(0, Math.min(23, Math.floor(dayStartHour)));
+
+      let target: Date;
+
+      if (timeZone) {
+        const formatter = new Intl.DateTimeFormat('en-US', {
+          timeZone,
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false,
+        });
+
+        const parts = formatter.formatToParts(now);
+        const lookup = (type: string) => parts.find(part => part.type === type)?.value ?? '00';
+        const zonedYear = Number(lookup('year'));
+        const zonedMonth = Number(lookup('month'));
+        const zonedDay = Number(lookup('day'));
+        const zonedHour = Number(lookup('hour'));
+        const zonedMinute = Number(lookup('minute'));
+        const zonedSecond = Number(lookup('second'));
+
+        const isBeforeStart = zonedHour < normalizedStartHour;
+        const targetDay = isBeforeStart ? zonedDay : zonedDay + 1;
+        target = getZonedDateFromParts(
+          timeZone,
+          zonedYear,
+          zonedMonth,
+          targetDay,
+          normalizedStartHour,
+          0,
+          0
+        );
+      } else {
+        target = new Date(now.getTime());
+        target.setHours(normalizedStartHour, 0, 0, 0);
+        if (now.getHours() >= normalizedStartHour) {
+          target.setDate(target.getDate() + 1);
+        }
+      }
+
+      const diff = Math.max(0, target.getTime() - now.getTime());
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff / (1000 * 60)) % 60);
+      const seconds = Math.floor((diff / 1000) % 60);
+      setDayCountdown(`${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`);
+    };
+
+    tick();
+    const timer = setInterval(tick, 1000);
+    return () => clearInterval(timer);
+  }, [dayStartHour, timeZone]);
 
 
   // -- Exercise Logic --
@@ -123,6 +218,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ daily, userStats, onLogSes
           <h2 className="text-2xl font-bold text-white mb-2">Initialize Protocol</h2>
           <p className="text-slate-400 mb-8 text-sm">Configure your {sessionsPerDay} session schedule for today.</p>
 
+          <div className="mb-6 bg-slate-900/60 border border-slate-700 rounded-xl p-3">
+            <div className="text-xs uppercase tracking-wider text-slate-500 font-bold">Nuevo día en</div>
+            <div className="text-2xl font-mono font-bold text-indigo-300 mt-1">{dayCountdown}</div>
+          </div>
+
           <div className="space-y-6 text-left">
             <div>
               <label className="block text-slate-300 text-sm font-bold mb-2">Start First Session At</label>
@@ -171,6 +271,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ daily, userStats, onLogSes
           <span className="text-orange-400 font-bold">{userStats.currentStreak} Day Streak</span>
         </div>
       </header>
+
+      <div className="mb-6 bg-slate-800/80 border border-slate-700 rounded-xl p-4 flex items-center justify-between">
+        <div>
+          <div className="text-xs uppercase tracking-wider text-slate-500 font-bold">Nuevo día de entrenamiento en</div>
+          <div className="text-2xl font-mono font-black text-indigo-300">{dayCountdown}</div>
+        </div>
+        <Clock className="text-indigo-400" size={22} />
+      </div>
 
       {/* Progress Slots */}
       <div className="grid grid-cols-5 gap-3 mb-6">

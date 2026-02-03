@@ -329,6 +329,8 @@ const App: React.FC = () => {
             onStartDay={handleStartDay}
             onUpdateSchedule={handleUpdateSchedule}
             sessionsPerDay={sessionsPerDay}
+            dayStartHour={user.settings.dayStartHour}
+            timeZone={user.settings.timeZone}
           />
         )}
         {view === ViewState.STATS && (
