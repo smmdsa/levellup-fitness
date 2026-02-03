@@ -7,11 +7,43 @@ interface ProfileProps {
   user: User;
   onUpdateSessionsPerDay: (nextCount: number) => void;
   onUpdateDayStartHour: (nextHour: number) => void;
+  onUpdateTimeZone: (nextTimeZone: string) => void;
 }
 
-export const Profile: React.FC<ProfileProps> = ({ user, onUpdateSessionsPerDay, onUpdateDayStartHour }) => {
+const fallbackTimeZones = [
+  'UTC',
+  'America/New_York',
+  'America/Chicago',
+  'America/Denver',
+  'America/Los_Angeles',
+  'America/Mexico_City',
+  'America/Bogota',
+  'America/Lima',
+  'America/Santiago',
+  'America/Argentina/Buenos_Aires',
+  'Europe/Madrid',
+  'Europe/London',
+  'Europe/Paris',
+  'Europe/Berlin',
+  'Africa/Johannesburg',
+  'Asia/Dubai',
+  'Asia/Singapore',
+  'Asia/Tokyo',
+  'Australia/Sydney'
+];
+
+export const Profile: React.FC<ProfileProps> = ({
+  user,
+  onUpdateSessionsPerDay,
+  onUpdateDayStartHour,
+  onUpdateTimeZone
+}) => {
   const { stats, profile } = user;
   const progressPercent = Math.min(100, (stats.currentXP / stats.nextLevelXP) * 100);
+  const timeZones =
+    typeof (Intl as typeof Intl & { supportedValuesOf?: (key: string) => string[] }).supportedValuesOf === 'function'
+      ? (Intl as typeof Intl & { supportedValuesOf: (key: string) => string[] }).supportedValuesOf('timeZone')
+      : fallbackTimeZones;
 
   return (
     <div className="pb-24 pt-6 px-4 max-w-md mx-auto min-h-screen">
@@ -98,6 +130,21 @@ export const Profile: React.FC<ProfileProps> = ({ user, onUpdateSessionsPerDay, 
               ))}
             </select>
             <p className="text-xs text-slate-500 mt-2">Choose when your day starts (24h format).</p>
+          </div>
+          <div>
+            <label className="block text-slate-300 text-sm font-bold mb-2">Time zone</label>
+            <select
+              value={user.settings.timeZone}
+              onChange={(e) => onUpdateTimeZone(e.target.value)}
+              className="w-full bg-slate-900 border border-slate-700 text-white rounded-lg p-3 focus:border-indigo-500 focus:outline-none text-lg"
+            >
+              {timeZones.map((timeZone) => (
+                <option key={timeZone} value={timeZone} className="bg-slate-900">
+                  {timeZone}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-slate-500 mt-2">This affects when a new day starts.</p>
           </div>
         </div>
       </div>

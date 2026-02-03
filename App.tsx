@@ -11,7 +11,9 @@ import { Profile } from './components/Profile';
 const App: React.FC = () => {
   const [view, setView] = useState<ViewState>(ViewState.DASHBOARD);
   const [user, setUser] = useState<User>(userRepository.get());
-  const [daily, setDaily] = useState<DailyProgress>(dailyProgressRepository.getToday(user.settings.dayStartHour));
+  const [daily, setDaily] = useState<DailyProgress>(
+    dailyProgressRepository.getToday(user.settings.dayStartHour, user.settings.timeZone)
+  );
   const [analytics, setAnalytics] = useState<AnalyticsData>(analyticsRepository.get());
   const [showLevelUp, setShowLevelUp] = useState(false);
   const sessionsPerDay = Math.max(1, Math.min(50, Math.floor(user.settings.sessionsPerDay ?? 10)));
@@ -67,9 +69,9 @@ const App: React.FC = () => {
   // Check for day reset on mount and visibility change
   useEffect(() => {
     const checkDate = () => {
-      const today = getTodayKey(user.settings.dayStartHour);
+      const today = getTodayKey(user.settings.dayStartHour, user.settings.timeZone);
       if (daily.date !== today) {
-        handleDayReset(daily, analytics, user.settings.dayStartHour);
+        handleDayReset(daily, analytics, user.settings.dayStartHour, user.settings.timeZone);
       }
     };
     
@@ -78,7 +80,12 @@ const App: React.FC = () => {
     return () => window.removeEventListener('focus', checkDate);
   }, [daily, analytics]);
 
-  const handleDayReset = (currentDaily: DailyProgress, currentAnalytics: AnalyticsData, dayStartHour: number) => {
+  const handleDayReset = (
+    currentDaily: DailyProgress,
+    currentAnalytics: AnalyticsData,
+    dayStartHour: number,
+    timeZone?: string
+  ) => {
     // 1. Archive yesterday
     const isAlreadyArchived = currentAnalytics.history.some(h => h.date === currentDaily.date);
     
@@ -96,7 +103,7 @@ const App: React.FC = () => {
 
     // 2. Reset Daily
     const newDaily: DailyProgress = {
-      date: getTodayKey(dayStartHour),
+      date: getTodayKey(dayStartHour, timeZone),
       isCompleted: false,
       sessionsDone: 0,
       sessions: [],
@@ -108,7 +115,7 @@ const App: React.FC = () => {
     // 3. Handle Streak Logic
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = getDayKey(yesterday, dayStartHour);
+    const yesterdayStr = getDayKey(yesterday, dayStartHour, timeZone);
     const yesterdayEntry = newAnalytics.history.find(h => h.date === yesterdayStr);
 
     let newUser = { ...user };
@@ -193,7 +200,7 @@ const App: React.FC = () => {
         }
     });
 
-    const today = getTodayKey(user.settings.dayStartHour);
+    const today = getTodayKey(user.settings.dayStartHour, user.settings.timeZone);
     const existingEntryIndex = newAnalytics.history.findIndex(entry => entry.date === today);
     if (existingEntryIndex >= 0) {
       const updatedEntry = { ...newAnalytics.history[existingEntryIndex] };
@@ -276,9 +283,27 @@ const App: React.FC = () => {
     setUser(newUser);
     userRepository.set(newUser);
 
-    const today = getTodayKey(normalized);
+    const today = getTodayKey(normalized, user.settings.timeZone);
     if (daily.date !== today) {
-      handleDayReset(daily, analytics, normalized);
+      handleDayReset(daily, analytics, normalized, user.settings.timeZone);
+    }
+  }, [daily, analytics, user]);
+
+  const handleUpdateTimeZone = useCallback((nextTimeZone: string) => {
+    const normalized = nextTimeZone?.trim() || 'UTC';
+    const newUser = {
+      ...user,
+      settings: {
+        ...user.settings,
+        timeZone: normalized,
+      }
+    };
+    setUser(newUser);
+    userRepository.set(newUser);
+
+    const today = getTodayKey(user.settings.dayStartHour, normalized);
+    if (daily.date !== today) {
+      handleDayReset(daily, analytics, user.settings.dayStartHour, normalized);
     }
   }, [daily, analytics, user]);
 
@@ -314,6 +339,7 @@ const App: React.FC = () => {
             user={user}
             onUpdateSessionsPerDay={handleUpdateSessionsPerDay}
             onUpdateDayStartHour={handleUpdateDayStartHour}
+            onUpdateTimeZone={handleUpdateTimeZone}
           />
         )}
       </div>

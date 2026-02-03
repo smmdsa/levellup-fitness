@@ -25,6 +25,7 @@ export const createDefaultUser = (): User => ({
     notificationsEnabled: false,
     sessionsPerDay: 10,
     dayStartHour: 8,
+    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
   },
 });
 
@@ -50,6 +51,10 @@ export class UserRepository extends BaseRepository<User> {
         const dayStartHour = Number.isFinite(dayStartHourRaw)
           ? Math.max(0, Math.min(23, Math.floor(dayStartHourRaw as number)))
           : fallback.settings.dayStartHour;
+        const timeZoneRaw = legacy?.settings?.timeZone;
+        const timeZone = typeof timeZoneRaw === 'string' && timeZoneRaw.trim().length > 0
+          ? timeZoneRaw
+          : fallback.settings.timeZone;
 
         return {
           ...fallback,
@@ -67,6 +72,7 @@ export class UserRepository extends BaseRepository<User> {
             ...legacy.settings,
             sessionsPerDay,
             dayStartHour,
+            timeZone,
           },
         };
       },

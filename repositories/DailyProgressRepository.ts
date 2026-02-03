@@ -6,7 +6,8 @@ import { BaseRepository } from './BaseRepository';
 const DAILY_KEY = 'levelup_daily';
 const DAILY_VERSION = 1;
 
-const getToday = (dayStartHour: number): string => getTodayKey(dayStartHour);
+const getToday = (dayStartHour: number, timeZone?: string): string =>
+  getTodayKey(dayStartHour, timeZone);
 
 export const createDefaultDailyProgress = (date: string = getToday(0)): DailyProgress => ({
   date,
@@ -26,8 +27,8 @@ export class DailyProgressRepository extends BaseRepository<DailyProgress> {
     });
   }
 
-  getToday(dayStartHour: number = 0): DailyProgress {
-    const today = getToday(dayStartHour);
+  getToday(dayStartHour: number = 0, timeZone?: string): DailyProgress {
+    const today = getToday(dayStartHour, timeZone);
     const envelope = this.readEnvelope();
 
     if (!envelope) {

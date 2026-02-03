@@ -21,6 +21,7 @@ export interface User {
     notificationsEnabled: boolean;
     sessionsPerDay: number;
     dayStartHour: number;
+    timeZone: string;
   };
 }
 
