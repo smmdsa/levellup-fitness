@@ -70,7 +70,7 @@ export const Stats: React.FC<StatsProps> = ({ analytics, userStats }) => {
             <p className="text-xs text-slate-400 mt-2">Arranca tu primera sesión y comienza a construir tu racha.</p>
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={200}>
             <BarChart data={chartData}>
               <XAxis 
                 dataKey="name" 
