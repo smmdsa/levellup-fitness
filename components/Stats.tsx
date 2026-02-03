@@ -64,27 +64,34 @@ export const Stats: React.FC<StatsProps> = ({ analytics, userStats }) => {
       {/* Chart */}
       <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 h-64 mb-8">
         <h3 className="text-sm font-bold text-slate-300 mb-4">Recent Intensity</h3>
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={chartData}>
-            <XAxis 
-              dataKey="name" 
-              stroke="#64748b" 
-              fontSize={12} 
-              tickLine={false}
-              axisLine={false}
-            />
-            <YAxis hide domain={[0, 10]} />
-            <Tooltip 
-              cursor={{fill: '#334155', opacity: 0.4}}
-              contentStyle={{ backgroundColor: '#1e293b', borderColor: '#475569', color: '#f8fafc' }}
-            />
-            <Bar dataKey="sessions" radius={[4, 4, 0, 0]}>
-              {chartData.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={entry.sessions >= 10 ? '#22c55e' : '#6366f1'} />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
+        {chartData.length === 0 ? (
+          <div className="h-full flex flex-col items-center justify-center text-center px-4">
+            <p className="text-slate-300 font-semibold">No data yet</p>
+            <p className="text-xs text-slate-400 mt-2">Arranca tu primera sesión y comienza a construir tu racha.</p>
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={chartData}>
+              <XAxis 
+                dataKey="name" 
+                stroke="#64748b" 
+                fontSize={12} 
+                tickLine={false}
+                axisLine={false}
+              />
+              <YAxis hide domain={[0, 10]} />
+              <Tooltip 
+                cursor={{fill: '#334155', opacity: 0.4}}
+                contentStyle={{ backgroundColor: '#1e293b', borderColor: '#475569', color: '#f8fafc' }}
+              />
+              <Bar dataKey="sessions" radius={[4, 4, 0, 0]}>
+                {chartData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={entry.sessions >= 10 ? '#22c55e' : '#6366f1'} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        )}
       </div>
     </div>
   );
