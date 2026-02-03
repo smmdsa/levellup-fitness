@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { ViewState, User, DailyProgress, AnalyticsData, Session, HistoryEntry, ExerciseItem, ScheduledSession } from './types';
-import * as Storage from './services/storageService';
 import * as Game from './services/gameService';
+import { userRepository, dailyProgressRepository, analyticsRepository } from './repositories';
 import { Navbar } from './components/Navbar';
 import { Dashboard } from './components/Dashboard';
 import { Stats } from './components/Stats';
@@ -9,9 +9,9 @@ import { Profile } from './components/Profile';
 
 const App: React.FC = () => {
   const [view, setView] = useState<ViewState>(ViewState.DASHBOARD);
-  const [user, setUser] = useState<User>(Storage.loadUser());
-  const [daily, setDaily] = useState<DailyProgress>(Storage.loadDailyProgress());
-  const [analytics, setAnalytics] = useState<AnalyticsData>(Storage.loadHistory());
+  const [user, setUser] = useState<User>(userRepository.get());
+  const [daily, setDaily] = useState<DailyProgress>(dailyProgressRepository.getToday());
+  const [analytics, setAnalytics] = useState<AnalyticsData>(analyticsRepository.get());
   const [showLevelUp, setShowLevelUp] = useState(false);
 
   // Request Notification Permission on Mount
@@ -54,7 +54,7 @@ const App: React.FC = () => {
         );
         const newDaily = { ...daily, schedule: updatedSchedule };
         setDaily(newDaily);
-        Storage.saveDailyProgress(newDaily);
+        dailyProgressRepository.set(newDaily);
       }
     };
 
@@ -88,7 +88,7 @@ const App: React.FC = () => {
         xpEarned: 0 
       };
       newAnalytics.history.push(historyEntry);
-      Storage.saveHistory(newAnalytics);
+      analyticsRepository.set(newAnalytics);
       setAnalytics(newAnalytics);
     }
 
@@ -100,7 +100,7 @@ const App: React.FC = () => {
       sessions: [],
       schedule: [] // Clear schedule for new day
     };
-    Storage.saveDailyProgress(newDaily);
+    dailyProgressRepository.set(newDaily);
     setDaily(newDaily);
 
     // 3. Handle Streak Logic
@@ -119,7 +119,7 @@ const App: React.FC = () => {
          newUser.stats.currentStreak = 0;
     }
     setUser(newUser);
-    Storage.saveUser(newUser);
+    userRepository.set(newUser);
   };
 
   const handleStartDay = (startTimeStr: string, intervalMinutes: number) => {
@@ -139,13 +139,13 @@ const App: React.FC = () => {
 
     const newDaily = { ...daily, schedule: newSchedule };
     setDaily(newDaily);
-    Storage.saveDailyProgress(newDaily);
+    dailyProgressRepository.set(newDaily);
   };
 
   const handleUpdateSchedule = (newSchedule: ScheduledSession[]) => {
     const newDaily = { ...daily, schedule: newSchedule };
     setDaily(newDaily);
-    Storage.saveDailyProgress(newDaily);
+    dailyProgressRepository.set(newDaily);
   };
 
   const handleLogSession = useCallback((completedExercises: ExerciseItem[]) => {
@@ -196,9 +196,9 @@ const App: React.FC = () => {
     setDaily(newDaily);
     setAnalytics(newAnalytics);
     
-    Storage.saveUser({ ...user, stats: updatedStats });
-    Storage.saveDailyProgress(newDaily);
-    Storage.saveHistory(newAnalytics);
+    userRepository.set({ ...user, stats: updatedStats });
+    dailyProgressRepository.set(newDaily);
+    analyticsRepository.set(newAnalytics);
 
     if (leveledUp) {
       setShowLevelUp(true);
