@@ -86,15 +86,18 @@ export const Profile: React.FC<ProfileProps> = ({ user, onUpdateSessionsPerDay, 
           </div>
           <div>
             <label className="block text-slate-300 text-sm font-bold mb-2">Day starts at</label>
-            <input
-              type="number"
-              min={0}
-              max={23}
+            <select
               value={user.settings.dayStartHour}
               onChange={(e) => onUpdateDayStartHour(Number(e.target.value))}
               className="w-full bg-slate-900 border border-slate-700 text-white rounded-lg p-3 focus:border-indigo-500 focus:outline-none text-lg"
-            />
-            <p className="text-xs text-slate-500 mt-2">Use 24h format. Example: 8 means the day starts at 08:00.</p>
+            >
+              {Array.from({ length: 24 }).map((_, hour) => (
+                <option key={hour} value={hour} className="bg-slate-900">
+                  {String(hour).padStart(2, '0')}:00
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-slate-500 mt-2">Choose when your day starts (24h format).</p>
           </div>
         </div>
       </div>
