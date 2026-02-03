@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { ViewState, User, DailyProgress, AnalyticsData, Session, HistoryEntry, ExerciseItem, ScheduledSession } from './types';
 import * as Game from './services/gameService';
+import { getDayKey, getTodayKey } from './services/dateService';
 import { userRepository, dailyProgressRepository, analyticsRepository } from './repositories';
 import { Navbar } from './components/Navbar';
 import { Dashboard } from './components/Dashboard';
@@ -10,7 +11,7 @@ import { Profile } from './components/Profile';
 const App: React.FC = () => {
   const [view, setView] = useState<ViewState>(ViewState.DASHBOARD);
   const [user, setUser] = useState<User>(userRepository.get());
-  const [daily, setDaily] = useState<DailyProgress>(dailyProgressRepository.getToday());
+  const [daily, setDaily] = useState<DailyProgress>(dailyProgressRepository.getToday(user.settings.dayStartHour));
   const [analytics, setAnalytics] = useState<AnalyticsData>(analyticsRepository.get());
   const [showLevelUp, setShowLevelUp] = useState(false);
   const sessionsPerDay = Math.max(1, Math.min(50, Math.floor(user.settings.sessionsPerDay ?? 10)));
@@ -66,9 +67,9 @@ const App: React.FC = () => {
   // Check for day reset on mount and visibility change
   useEffect(() => {
     const checkDate = () => {
-      const today = new Date().toISOString().split('T')[0];
+      const today = getTodayKey(user.settings.dayStartHour);
       if (daily.date !== today) {
-        handleDayReset(daily, analytics);
+        handleDayReset(daily, analytics, user.settings.dayStartHour);
       }
     };
     
@@ -77,7 +78,7 @@ const App: React.FC = () => {
     return () => window.removeEventListener('focus', checkDate);
   }, [daily, analytics]);
 
-  const handleDayReset = (currentDaily: DailyProgress, currentAnalytics: AnalyticsData) => {
+  const handleDayReset = (currentDaily: DailyProgress, currentAnalytics: AnalyticsData, dayStartHour: number) => {
     // 1. Archive yesterday
     const isAlreadyArchived = currentAnalytics.history.some(h => h.date === currentDaily.date);
     
@@ -95,7 +96,7 @@ const App: React.FC = () => {
 
     // 2. Reset Daily
     const newDaily: DailyProgress = {
-      date: new Date().toISOString().split('T')[0],
+      date: getTodayKey(dayStartHour),
       isCompleted: false,
       sessionsDone: 0,
       sessions: [],
@@ -107,7 +108,7 @@ const App: React.FC = () => {
     // 3. Handle Streak Logic
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = yesterday.toISOString().split('T')[0];
+    const yesterdayStr = getDayKey(yesterday, dayStartHour);
     const yesterdayEntry = newAnalytics.history.find(h => h.date === yesterdayStr);
 
     let newUser = { ...user };
@@ -192,7 +193,7 @@ const App: React.FC = () => {
         }
     });
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = getTodayKey(user.settings.dayStartHour);
     const existingEntryIndex = newAnalytics.history.findIndex(entry => entry.date === today);
     if (existingEntryIndex >= 0) {
       const updatedEntry = { ...newAnalytics.history[existingEntryIndex] };
@@ -263,6 +264,24 @@ const App: React.FC = () => {
     }
   }, [daily, user]);
 
+  const handleUpdateDayStartHour = useCallback((nextHour: number) => {
+    const normalized = Math.max(0, Math.min(23, Math.floor(nextHour)));
+    const newUser = {
+      ...user,
+      settings: {
+        ...user.settings,
+        dayStartHour: normalized,
+      }
+    };
+    setUser(newUser);
+    userRepository.set(newUser);
+
+    const today = getTodayKey(normalized);
+    if (daily.date !== today) {
+      handleDayReset(daily, analytics, normalized);
+    }
+  }, [daily, analytics, user]);
+
   return (
     <div className="bg-slate-900 min-h-screen font-sans text-slate-100 selection:bg-indigo-500 selection:text-white">
       {/* Level Up Overlay */}
@@ -291,7 +310,11 @@ const App: React.FC = () => {
           <Stats analytics={analytics} userStats={user.stats} sessionsPerDay={sessionsPerDay} />
         )}
         {view === ViewState.PROFILE && (
-          <Profile user={user} onUpdateSessionsPerDay={handleUpdateSessionsPerDay} />
+          <Profile
+            user={user}
+            onUpdateSessionsPerDay={handleUpdateSessionsPerDay}
+            onUpdateDayStartHour={handleUpdateDayStartHour}
+          />
         )}
       </div>
 
