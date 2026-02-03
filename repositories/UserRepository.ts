@@ -24,6 +24,7 @@ export const createDefaultUser = (): User => ({
   settings: {
     notificationsEnabled: false,
     sessionsPerDay: 10,
+    dayStartHour: 8,
   },
 });
 
@@ -45,6 +46,10 @@ export class UserRepository extends BaseRepository<User> {
         const sessionsPerDay = Number.isFinite(sessionsPerDayRaw)
           ? Math.max(1, Math.min(50, Math.floor(sessionsPerDayRaw as number)))
           : fallback.settings.sessionsPerDay;
+        const dayStartHourRaw = legacy?.settings?.dayStartHour;
+        const dayStartHour = Number.isFinite(dayStartHourRaw)
+          ? Math.max(0, Math.min(23, Math.floor(dayStartHourRaw as number)))
+          : fallback.settings.dayStartHour;
 
         return {
           ...fallback,
@@ -61,6 +66,7 @@ export class UserRepository extends BaseRepository<User> {
             ...fallback.settings,
             ...legacy.settings,
             sessionsPerDay,
+            dayStartHour,
           },
         };
       },

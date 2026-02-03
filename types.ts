@@ -20,6 +20,7 @@ export interface User {
   settings: {
     notificationsEnabled: boolean;
     sessionsPerDay: number;
+    dayStartHour: number;
   };
 }
 

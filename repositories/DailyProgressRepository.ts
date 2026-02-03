@@ -1,13 +1,14 @@
 import type { DailyProgress } from '../types';
+import { getTodayKey } from '../services/dateService';
 import type { DataStore } from './storage/DataStore';
 import { BaseRepository } from './BaseRepository';
 
 const DAILY_KEY = 'levelup_daily';
 const DAILY_VERSION = 1;
 
-const getToday = (): string => new Date().toISOString().split('T')[0];
+const getToday = (dayStartHour: number): string => getTodayKey(dayStartHour);
 
-export const createDefaultDailyProgress = (date: string = getToday()): DailyProgress => ({
+export const createDefaultDailyProgress = (date: string = getToday(0)): DailyProgress => ({
   date,
   isCompleted: false,
   sessionsDone: 0,
@@ -25,8 +26,8 @@ export class DailyProgressRepository extends BaseRepository<DailyProgress> {
     });
   }
 
-  getToday(): DailyProgress {
-    const today = getToday();
+  getToday(dayStartHour: number = 0): DailyProgress {
+    const today = getToday(dayStartHour);
     const envelope = this.readEnvelope();
 
     if (!envelope) {

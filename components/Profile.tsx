@@ -6,9 +6,10 @@ import { Shield, Zap, Coins } from 'lucide-react';
 interface ProfileProps {
   user: User;
   onUpdateSessionsPerDay: (nextCount: number) => void;
+  onUpdateDayStartHour: (nextHour: number) => void;
 }
 
-export const Profile: React.FC<ProfileProps> = ({ user, onUpdateSessionsPerDay }) => {
+export const Profile: React.FC<ProfileProps> = ({ user, onUpdateSessionsPerDay, onUpdateDayStartHour }) => {
   const { stats, profile } = user;
   const progressPercent = Math.min(100, (stats.currentXP / stats.nextLevelXP) * 100);
 
@@ -82,6 +83,18 @@ export const Profile: React.FC<ProfileProps> = ({ user, onUpdateSessionsPerDay }
               className="w-full bg-slate-900 border border-slate-700 text-white rounded-lg p-3 focus:border-indigo-500 focus:outline-none text-lg"
             />
             <p className="text-xs text-slate-500 mt-2">Define how many sessions you want in your daily routine.</p>
+          </div>
+          <div>
+            <label className="block text-slate-300 text-sm font-bold mb-2">Day starts at</label>
+            <input
+              type="number"
+              min={0}
+              max={23}
+              value={user.settings.dayStartHour}
+              onChange={(e) => onUpdateDayStartHour(Number(e.target.value))}
+              className="w-full bg-slate-900 border border-slate-700 text-white rounded-lg p-3 focus:border-indigo-500 focus:outline-none text-lg"
+            />
+            <p className="text-xs text-slate-500 mt-2">Use 24h format. Example: 8 means the day starts at 08:00.</p>
           </div>
         </div>
       </div>

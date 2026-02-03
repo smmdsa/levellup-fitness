@@ -13,7 +13,8 @@ export const saveHistory = (data: AnalyticsData) => {
   analyticsRepository.set(data);
 };
 
-export const loadDailyProgress = (): DailyProgress => dailyProgressRepository.getToday();
+export const loadDailyProgress = (dayStartHour: number = 0): DailyProgress =>
+  dailyProgressRepository.getToday(dayStartHour);
 
 export const saveDailyProgress = (progress: DailyProgress) => {
   dailyProgressRepository.set(progress);
