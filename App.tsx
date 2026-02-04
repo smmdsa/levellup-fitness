@@ -1,12 +1,22 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import type { Clan as ClanData, ClanInvite, ClanMember, ClanStore } from './types';
 import { ViewState, User, DailyProgress, AnalyticsData, Session, HistoryEntry, ExerciseItem, ScheduledSession } from './types';
 import * as Game from './services/gameService';
 import { getDayKey, getTodayKey } from './services/dateService';
-import { userRepository, dailyProgressRepository, analyticsRepository } from './repositories';
+import { userRepository, dailyProgressRepository, analyticsRepository, clanRepository } from './repositories';
 import { Navbar } from './components/Navbar';
 import { Dashboard } from './components/Dashboard';
 import { Stats } from './components/Stats';
 import { Profile } from './components/Profile';
+import { Clan } from './components/Clan';
+
+const createId = () => {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return crypto.randomUUID();
+  }
+
+  return `id_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+};
 
 const App: React.FC = () => {
   const [view, setView] = useState<ViewState>(ViewState.DASHBOARD);
@@ -15,6 +25,7 @@ const App: React.FC = () => {
     dailyProgressRepository.getToday(user.settings.dayStartHour, user.settings.timeZone)
   );
   const [analytics, setAnalytics] = useState<AnalyticsData>(analyticsRepository.get());
+  const [clanStore, setClanStore] = useState<ClanStore>(clanRepository.get());
   const [showLevelUp, setShowLevelUp] = useState(false);
   const sessionsPerDay = Math.max(1, Math.min(50, Math.floor(user.settings.sessionsPerDay ?? 10)));
 
@@ -229,11 +240,303 @@ const App: React.FC = () => {
     dailyProgressRepository.set(newDaily);
     analyticsRepository.set(newAnalytics);
 
+    // 6. Update Clan Contributions
+    if (user.clan.status === 'member' || user.clan.status === 'leader') {
+      const clanId = user.clan.clanId;
+      if (clanId) {
+        const clanIndex = clanStore.clans.findIndex(clan => clan.id === clanId);
+        if (clanIndex >= 0) {
+          const clan = clanStore.clans[clanIndex];
+          const memberIndex = clan.members.findIndex(member => member.userId === user.profile.id);
+          const updatedMembers = memberIndex >= 0
+            ? clan.members.map((member, idx) => (
+              idx === memberIndex
+                ? {
+                    ...member,
+                    contributionXP: member.contributionXP + earnedXP,
+                    contributionSessions: member.contributionSessions + 1,
+                  }
+                : member
+            ))
+            : [
+                ...clan.members,
+                {
+                  userId: user.profile.id,
+                  username: user.profile.username,
+                  avatarUrl: user.profile.avatarUrl,
+                  role: 'member',
+                  joinedAt: new Date().toISOString(),
+                  contributionXP: earnedXP,
+                  contributionSessions: 1,
+                }
+              ];
+
+          const updatedClan: ClanData = {
+            ...clan,
+            members: updatedMembers,
+            stats: {
+              ...clan.stats,
+              totalXP: clan.stats.totalXP + earnedXP,
+              totalSessions: clan.stats.totalSessions + 1,
+            },
+          };
+
+          const nextClanStore = {
+            ...clanStore,
+            clans: clanStore.clans.map((item, idx) => (idx === clanIndex ? updatedClan : item)),
+          };
+          setClanStore(nextClanStore);
+          clanRepository.set(nextClanStore);
+        }
+      }
+    }
+
     if (leveledUp) {
       setShowLevelUp(true);
       setTimeout(() => setShowLevelUp(false), 3000);
     }
-  }, [daily, user, analytics, sessionsPerDay]);
+  }, [daily, user, analytics, sessionsPerDay, clanStore]);
+
+  const updateClanStore = (nextStore: ClanStore) => {
+    setClanStore(nextStore);
+    clanRepository.set(nextStore);
+  };
+
+  const handleCreateClan = useCallback((payload: { name: string; tag: string; motto: string }) => {
+    if (!payload.name || !payload.tag) return;
+
+    const now = new Date().toISOString();
+    const clanId = createId();
+    const leader: ClanMember = {
+      userId: user.profile.id,
+      username: user.profile.username,
+      avatarUrl: user.profile.avatarUrl,
+      role: 'leader',
+      joinedAt: now,
+      contributionXP: 0,
+      contributionSessions: 0,
+    };
+
+    const clan: ClanData = {
+      id: clanId,
+      name: payload.name,
+      tag: payload.tag,
+      motto: payload.motto || undefined,
+      createdAt: now,
+      leaderId: user.profile.id,
+      members: [leader],
+      invites: [],
+      stats: {
+        totalXP: 0,
+        totalSessions: 0,
+        createdAt: now,
+      },
+    };
+
+    updateClanStore({ ...clanStore, clans: [...clanStore.clans, clan] });
+
+    const nextUser = {
+      ...user,
+      clan: {
+        status: 'leader',
+        clanId,
+        invitedClanId: null,
+        invitedAt: null,
+      },
+    };
+    setUser(nextUser);
+    userRepository.set(nextUser);
+  }, [clanStore, user]);
+
+  const handleRequestInvite = useCallback((clanId: string) => {
+    if (user.clan.status !== 'none') return;
+
+    const now = new Date().toISOString();
+    const invite: ClanInvite = {
+      id: createId(),
+      clanId,
+      invitedUserId: user.profile.id,
+      invitedUsername: user.profile.username,
+      invitedAt: now,
+      status: 'pending',
+    };
+
+    const nextStore = {
+      ...clanStore,
+      clans: clanStore.clans.map(clan => (
+        clan.id === clanId ? { ...clan, invites: [...clan.invites, invite] } : clan
+      )),
+    };
+    updateClanStore(nextStore);
+
+    const nextUser = {
+      ...user,
+      clan: {
+        status: 'invited',
+        clanId: null,
+        invitedClanId: clanId,
+        invitedAt: now,
+      },
+    };
+    setUser(nextUser);
+    userRepository.set(nextUser);
+  }, [clanStore, user]);
+
+  const handleAcceptInvite = useCallback(() => {
+    if (user.clan.status !== 'invited' || !user.clan.invitedClanId) return;
+
+    const clanId = user.clan.invitedClanId;
+    const now = new Date().toISOString();
+
+    const nextStore = {
+      ...clanStore,
+      clans: clanStore.clans.map(clan => {
+        if (clan.id !== clanId) return clan;
+
+        const memberExists = clan.members.some(member => member.userId === user.profile.id);
+        const updatedMembers = memberExists
+          ? clan.members
+          : [
+              ...clan.members,
+              {
+                userId: user.profile.id,
+                username: user.profile.username,
+                avatarUrl: user.profile.avatarUrl,
+                role: 'member',
+                joinedAt: now,
+                contributionXP: 0,
+                contributionSessions: 0,
+              },
+            ];
+
+        const updatedInvites = clan.invites.map(invite =>
+          invite.invitedUserId === user.profile.id && invite.status === 'pending'
+            ? { ...invite, status: 'accepted' }
+            : invite
+        );
+
+        return {
+          ...clan,
+          members: updatedMembers,
+          invites: updatedInvites,
+        };
+      }),
+    };
+    updateClanStore(nextStore);
+
+    const nextUser = {
+      ...user,
+      clan: {
+        status: 'member',
+        clanId,
+        invitedClanId: null,
+        invitedAt: null,
+      },
+    };
+    setUser(nextUser);
+    userRepository.set(nextUser);
+  }, [clanStore, user]);
+
+  const handleDeclineInvite = useCallback(() => {
+    if (user.clan.status !== 'invited' || !user.clan.invitedClanId) return;
+
+    const clanId = user.clan.invitedClanId;
+    const nextStore = {
+      ...clanStore,
+      clans: clanStore.clans.map(clan => (
+        clan.id === clanId
+          ? {
+              ...clan,
+              invites: clan.invites.map(invite =>
+                invite.invitedUserId === user.profile.id && invite.status === 'pending'
+                  ? { ...invite, status: 'declined' }
+                  : invite
+              ),
+            }
+          : clan
+      )),
+    };
+    updateClanStore(nextStore);
+
+    const nextUser = {
+      ...user,
+      clan: {
+        status: 'none',
+        clanId: null,
+        invitedClanId: null,
+        invitedAt: null,
+      },
+    };
+    setUser(nextUser);
+    userRepository.set(nextUser);
+  }, [clanStore, user]);
+
+  const handleLeaveClan = useCallback(() => {
+    if (user.clan.status !== 'member' || !user.clan.clanId) return;
+    const clanId = user.clan.clanId;
+
+    const nextStore = {
+      ...clanStore,
+      clans: clanStore.clans.map(clan => (
+        clan.id === clanId
+          ? { ...clan, members: clan.members.filter(member => member.userId !== user.profile.id) }
+          : clan
+      )),
+    };
+    updateClanStore(nextStore);
+
+    const nextUser = {
+      ...user,
+      clan: {
+        status: 'none',
+        clanId: null,
+        invitedClanId: null,
+        invitedAt: null,
+      },
+    };
+    setUser(nextUser);
+    userRepository.set(nextUser);
+  }, [clanStore, user]);
+
+  const handleDisbandClan = useCallback(() => {
+    if (user.clan.status !== 'leader' || !user.clan.clanId) return;
+    const clanId = user.clan.clanId;
+    updateClanStore({ ...clanStore, clans: clanStore.clans.filter(clan => clan.id !== clanId) });
+
+    const nextUser = {
+      ...user,
+      clan: {
+        status: 'none',
+        clanId: null,
+        invitedClanId: null,
+        invitedAt: null,
+      },
+    };
+    setUser(nextUser);
+    userRepository.set(nextUser);
+  }, [clanStore, user]);
+
+  const handleSendInvite = useCallback((invitedUsername: string) => {
+    if (user.clan.status !== 'leader' || !user.clan.clanId) return;
+
+    const now = new Date().toISOString();
+    const invite: ClanInvite = {
+      id: createId(),
+      clanId: user.clan.clanId,
+      invitedUserId: createId(),
+      invitedUsername,
+      invitedAt: now,
+      status: 'pending',
+    };
+
+    const nextStore = {
+      ...clanStore,
+      clans: clanStore.clans.map(clan => (
+        clan.id === user.clan.clanId ? { ...clan, invites: [...clan.invites, invite] } : clan
+      )),
+    };
+    updateClanStore(nextStore);
+  }, [clanStore, user]);
 
   const handleUpdateSessionsPerDay = useCallback((nextCount: number) => {
     const normalized = Math.max(1, Math.min(50, Math.floor(nextCount)));
@@ -342,6 +645,19 @@ const App: React.FC = () => {
             onUpdateSessionsPerDay={handleUpdateSessionsPerDay}
             onUpdateDayStartHour={handleUpdateDayStartHour}
             onUpdateTimeZone={handleUpdateTimeZone}
+          />
+        )}
+        {view === ViewState.CLAN && (
+          <Clan
+            user={user}
+            clanStore={clanStore}
+            onCreateClan={handleCreateClan}
+            onRequestInvite={handleRequestInvite}
+            onAcceptInvite={handleAcceptInvite}
+            onDeclineInvite={handleDeclineInvite}
+            onLeaveClan={handleLeaveClan}
+            onDisbandClan={handleDisbandClan}
+            onSendInvite={handleSendInvite}
           />
         )}
       </div>

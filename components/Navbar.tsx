@@ -1,6 +1,6 @@
 import React from 'react';
 import { ViewState } from '../types';
-import { Activity, BarChart2, User as UserIcon } from 'lucide-react';
+import { Activity, BarChart2, User as UserIcon, Users } from 'lucide-react';
 
 interface NavbarProps {
   currentView: ViewState;
@@ -11,6 +11,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, setView }) => {
   const navItems = [
     { id: ViewState.DASHBOARD, label: 'Train', icon: Activity },
     { id: ViewState.STATS, label: 'Stats', icon: BarChart2 },
+    { id: ViewState.CLAN, label: 'Clan', icon: Users },
     { id: ViewState.PROFILE, label: 'Profile', icon: UserIcon },
   ];
 

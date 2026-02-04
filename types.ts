@@ -1,4 +1,5 @@
 export interface UserProfile {
+  id: string;
   username: string;
   avatarUrl: string; // Using placeholder for now
   createdAt: string;
@@ -23,6 +24,56 @@ export interface User {
     dayStartHour: number;
     timeZone: string;
   };
+  clan: {
+    status: ClanMembershipStatus;
+    clanId: string | null;
+    invitedClanId: string | null;
+    invitedAt: string | null;
+  };
+}
+
+export type ClanRole = 'leader' | 'member';
+export type ClanMembershipStatus = 'none' | 'invited' | 'member' | 'leader';
+
+export interface ClanMember {
+  userId: string;
+  username: string;
+  avatarUrl: string;
+  role: ClanRole;
+  joinedAt: string;
+  contributionXP: number;
+  contributionSessions: number;
+}
+
+export interface ClanInvite {
+  id: string;
+  clanId: string;
+  invitedUserId: string;
+  invitedUsername: string;
+  invitedAt: string;
+  status: 'pending' | 'accepted' | 'declined';
+}
+
+export interface ClanStats {
+  totalXP: number;
+  totalSessions: number;
+  createdAt: string;
+}
+
+export interface Clan {
+  id: string;
+  name: string;
+  tag: string;
+  motto?: string;
+  createdAt: string;
+  leaderId: string;
+  members: ClanMember[];
+  invites: ClanInvite[];
+  stats: ClanStats;
+}
+
+export interface ClanStore {
+  clans: Clan[];
 }
 
 export interface ExerciseItem {
@@ -71,5 +122,6 @@ export interface AnalyticsData {
 export enum ViewState {
   DASHBOARD = 'DASHBOARD',
   STATS = 'STATS',
-  PROFILE = 'PROFILE'
+  PROFILE = 'PROFILE',
+  CLAN = 'CLAN'
 }

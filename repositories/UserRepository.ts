@@ -4,10 +4,19 @@ import type { DataStore } from './storage/DataStore';
 import { BaseRepository } from './BaseRepository';
 
 const USER_KEY = 'levelup_user';
-const USER_VERSION = 2;
+const USER_VERSION = 3;
+
+const createUserId = () => {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return crypto.randomUUID();
+  }
+
+  return `user_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+};
 
 export const createDefaultUser = (): User => ({
   profile: {
+    id: createUserId(),
     username: 'Rookie',
     avatarUrl: 'https://picsum.photos/200',
     createdAt: new Date().toISOString(),
@@ -26,6 +35,12 @@ export const createDefaultUser = (): User => ({
     sessionsPerDay: 10,
     dayStartHour: 8,
     timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+  },
+  clan: {
+    status: 'none',
+    clanId: null,
+    invitedClanId: null,
+    invitedAt: null,
   },
 });
 
@@ -56,12 +71,24 @@ export class UserRepository extends BaseRepository<User> {
           ? timeZoneRaw
           : fallback.settings.timeZone;
 
+        const profileId = typeof legacy?.profile?.id === 'string' && legacy.profile.id.trim().length > 0
+          ? legacy.profile.id
+          : fallback.profile.id;
+        const clanStatus = legacy?.clan?.status;
+        const clanId = typeof legacy?.clan?.clanId === 'string' ? legacy.clan.clanId : null;
+        const invitedClanId = typeof legacy?.clan?.invitedClanId === 'string' ? legacy.clan.invitedClanId : null;
+        const invitedAt = typeof legacy?.clan?.invitedAt === 'string' ? legacy.clan.invitedAt : null;
+        const normalizedStatus = clanStatus === 'leader' || clanStatus === 'member' || clanStatus === 'invited'
+          ? clanStatus
+          : 'none';
+
         return {
           ...fallback,
           ...legacy,
           profile: {
             ...fallback.profile,
             ...legacy.profile,
+            id: profileId,
           },
           stats: {
             ...fallback.stats,
@@ -73,6 +100,12 @@ export class UserRepository extends BaseRepository<User> {
             sessionsPerDay,
             dayStartHour,
             timeZone,
+          },
+          clan: {
+            status: normalizedStatus,
+            clanId: normalizedStatus === 'member' || normalizedStatus === 'leader' ? clanId : null,
+            invitedClanId: normalizedStatus === 'invited' ? invitedClanId : null,
+            invitedAt: normalizedStatus === 'invited' ? invitedAt : null,
           },
         };
       },
