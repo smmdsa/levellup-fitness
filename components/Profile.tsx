@@ -1,13 +1,18 @@
-import React from 'react';
-import { User } from '../types';
+import React, { useEffect, useState } from 'react';
+import { Sex, User } from '../types';
 import { LevelBadge } from './LevelBadge';
-import { Shield, Zap, Coins } from 'lucide-react';
+import { Shield, Zap, Coins, Pencil, Check, X } from 'lucide-react';
 
 interface ProfileProps {
   user: User;
   onUpdateSessionsPerDay: (nextCount: number) => void;
   onUpdateDayStartHour: (nextHour: number) => void;
   onUpdateTimeZone: (nextTimeZone: string) => void;
+  onUpdateHealthProfile: (payload: {
+    heightCm: number | null;
+    sex: Sex | null;
+    birthDate: string | null;
+  }) => void;
 }
 
 const fallbackTimeZones = [
@@ -36,7 +41,8 @@ export const Profile: React.FC<ProfileProps> = ({
   user,
   onUpdateSessionsPerDay,
   onUpdateDayStartHour,
-  onUpdateTimeZone
+  onUpdateTimeZone,
+  onUpdateHealthProfile
 }) => {
   const { stats, profile } = user;
   const progressPercent = Math.min(100, (stats.currentXP / stats.nextLevelXP) * 100);
@@ -44,6 +50,59 @@ export const Profile: React.FC<ProfileProps> = ({
     typeof (Intl as typeof Intl & { supportedValuesOf?: (key: string) => string[] }).supportedValuesOf === 'function'
       ? (Intl as typeof Intl & { supportedValuesOf: (key: string) => string[] }).supportedValuesOf('timeZone')
       : fallbackTimeZones;
+  const [editingHealth, setEditingHealth] = useState(false);
+  const [healthForm, setHealthForm] = useState({
+    heightCm: profile.heightCm ? String(profile.heightCm) : '',
+    sex: profile.sex ?? '',
+    birthDate: profile.birthDate ?? '',
+  });
+
+  useEffect(() => {
+    if (!editingHealth) {
+      setHealthForm({
+        heightCm: profile.heightCm ? String(profile.heightCm) : '',
+        sex: profile.sex ?? '',
+        birthDate: profile.birthDate ?? '',
+      });
+    }
+  }, [editingHealth, profile.birthDate, profile.heightCm, profile.sex]);
+
+  const ageLabel = (() => {
+    if (!profile.birthDate) return null;
+    const birthDate = new Date(`${profile.birthDate}T00:00:00`);
+    if (Number.isNaN(birthDate.getTime())) return null;
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age -= 1;
+    }
+    return `${age} anos`;
+  })();
+
+  const handleSaveHealth = () => {
+    const heightRaw = Number(healthForm.heightCm);
+    const heightCm = Number.isFinite(heightRaw) && heightRaw > 0 ? Math.round(heightRaw) : null;
+    const sex = healthForm.sex === 'male' || healthForm.sex === 'female' || healthForm.sex === 'other'
+      ? (healthForm.sex as Sex)
+      : null;
+    const birthDate = healthForm.birthDate ? healthForm.birthDate : null;
+
+    onUpdateHealthProfile({
+      heightCm,
+      sex,
+      birthDate,
+    });
+    setEditingHealth(false);
+  };
+
+  const sexLabel = profile.sex === 'male'
+    ? 'Hombre'
+    : profile.sex === 'female'
+      ? 'Mujer'
+      : profile.sex === 'other'
+        ? 'Otro'
+        : 'Sin definir';
 
   return (
     <div className="pb-24 pt-6 px-4 max-w-md mx-auto min-h-screen">
@@ -147,6 +206,94 @@ export const Profile: React.FC<ProfileProps> = ({
             <p className="text-xs text-slate-500 mt-2">This affects when a new day starts.</p>
           </div>
         </div>
+      </div>
+
+      <div className="mt-8 bg-slate-800 p-4 rounded-xl border border-slate-700">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-white font-bold">Health Profile</h3>
+          {!editingHealth ? (
+            <button
+              onClick={() => setEditingHealth(true)}
+              className="text-slate-400 hover:text-white transition"
+              aria-label="Editar perfil de salud"
+            >
+              <Pencil size={18} />
+            </button>
+          ) : (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleSaveHealth}
+                className="text-emerald-400 hover:text-emerald-300"
+                aria-label="Guardar perfil de salud"
+              >
+                <Check size={18} />
+              </button>
+              <button
+                onClick={() => setEditingHealth(false)}
+                className="text-red-400 hover:text-red-300"
+                aria-label="Cancelar edicion"
+              >
+                <X size={18} />
+              </button>
+            </div>
+          )}
+        </div>
+        {!editingHealth ? (
+          <div className="space-y-3 text-sm text-slate-300">
+            <div className="flex justify-between">
+              <span className="text-slate-500">Altura</span>
+              <span>{profile.heightCm ? `${profile.heightCm} cm` : 'Sin configurar'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-500">Sexo</span>
+              <span>{sexLabel}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-500">Nacimiento</span>
+              <span>{profile.birthDate ? profile.birthDate : 'Sin configurar'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-500">Edad</span>
+              <span>{ageLabel ?? 'Sin calcular'}</span>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div>
+              <label className="block text-slate-300 text-sm font-bold mb-2">Altura (cm)</label>
+              <input
+                type="number"
+                min={80}
+                max={250}
+                value={healthForm.heightCm}
+                onChange={(event) => setHealthForm((prev) => ({ ...prev, heightCm: event.target.value }))}
+                className="w-full bg-slate-900 border border-slate-700 text-white rounded-lg p-3 focus:border-indigo-500 focus:outline-none text-lg"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-300 text-sm font-bold mb-2">Sexo</label>
+              <select
+                value={healthForm.sex}
+                onChange={(event) => setHealthForm((prev) => ({ ...prev, sex: event.target.value }))}
+                className="w-full bg-slate-900 border border-slate-700 text-white rounded-lg p-3 focus:border-indigo-500 focus:outline-none text-lg"
+              >
+                <option value="" className="bg-slate-900">Selecciona</option>
+                <option value="male" className="bg-slate-900">Hombre</option>
+                <option value="female" className="bg-slate-900">Mujer</option>
+                <option value="other" className="bg-slate-900">Otro</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-slate-300 text-sm font-bold mb-2">Fecha de nacimiento</label>
+              <input
+                type="date"
+                value={healthForm.birthDate}
+                onChange={(event) => setHealthForm((prev) => ({ ...prev, birthDate: event.target.value }))}
+                className="w-full bg-slate-900 border border-slate-700 text-white rounded-lg p-3 focus:border-indigo-500 focus:outline-none text-lg"
+              />
+            </div>
+          </div>
+        )}
       </div>
       
       <div className="mt-8">

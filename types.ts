@@ -3,7 +3,12 @@ export interface UserProfile {
   username: string;
   avatarUrl: string; // Using placeholder for now
   createdAt: string;
+  heightCm: number | null;
+  sex: Sex | null;
+  birthDate: string | null;
 }
+
+export type Sex = 'male' | 'female' | 'other';
 
 export interface UserStats {
   level: number;
@@ -109,6 +114,12 @@ export interface HistoryEntry {
   xpEarned: number;
 }
 
+export interface WeightEntry {
+  date: string;
+  weightKg: number;
+  note?: string;
+}
+
 export interface AnalyticsData {
   history: HistoryEntry[];
   totalReps: {
@@ -117,6 +128,7 @@ export interface AnalyticsData {
     core: number;
     legs: number;
   };
+  weightEntries: WeightEntry[];
 }
 
 export enum ViewState {

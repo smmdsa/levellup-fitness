@@ -1,6 +1,15 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import type { Clan as ClanData, ClanInvite, ClanMember, ClanStore } from './types';
-import { ViewState, User, DailyProgress, AnalyticsData, Session, HistoryEntry, ExerciseItem, ScheduledSession } from './types';
+import {
+  ViewState,
+  User,
+  DailyProgress,
+  AnalyticsData,
+  Session,
+  HistoryEntry,
+  ExerciseItem,
+  ScheduledSession,
+} from './types';
 import * as Game from './services/gameService';
 import { getDayKey, getTodayKey } from './services/dateService';
 import { userRepository, dailyProgressRepository, analyticsRepository, clanRepository } from './repositories';
@@ -28,6 +37,7 @@ const App: React.FC = () => {
   const [clanStore, setClanStore] = useState<ClanStore>(clanRepository.get());
   const [showLevelUp, setShowLevelUp] = useState(false);
   const sessionsPerDay = Math.max(1, Math.min(50, Math.floor(user.settings.sessionsPerDay ?? 10)));
+  const weightRewardCoins = 10;
 
   // Request Notification Permission on Mount
   useEffect(() => {
@@ -610,6 +620,68 @@ const App: React.FC = () => {
     }
   }, [daily, analytics, user]);
 
+  const handleUpdateHealthProfile = useCallback((payload: {
+    heightCm: number | null;
+    sex: 'male' | 'female' | 'other' | null;
+    birthDate: string | null;
+  }) => {
+    const newUser = {
+      ...user,
+      profile: {
+        ...user.profile,
+        heightCm: payload.heightCm,
+        sex: payload.sex,
+        birthDate: payload.birthDate,
+      },
+    };
+    setUser(newUser);
+    userRepository.set(newUser);
+  }, [user]);
+
+  const handleLogWeight = useCallback((payload: { date: string; weightKg: number; note?: string }) => {
+    const normalizedDate = payload.date?.trim().length > 0
+      ? payload.date.trim()
+      : getTodayKey(user.settings.dayStartHour, user.settings.timeZone);
+    const weightValue = Number(payload.weightKg);
+    if (!Number.isFinite(weightValue) || weightValue <= 0) {
+      return;
+    }
+
+    const entry = {
+      date: normalizedDate,
+      weightKg: Number(weightValue.toFixed(1)),
+      note: payload.note?.trim() || undefined,
+    };
+
+    const currentEntries = analytics.weightEntries ?? [];
+    const existingIndex = currentEntries.findIndex((item) => item.date === normalizedDate);
+    const nextEntries = existingIndex >= 0
+      ? currentEntries.map((item, index) => (index === existingIndex ? entry : item))
+      : [...currentEntries, entry];
+
+    const sortedEntries = [...nextEntries].sort((a, b) => a.date.localeCompare(b.date));
+    const nextAnalytics = {
+      ...analytics,
+      weightEntries: sortedEntries,
+    };
+
+    const today = getTodayKey(user.settings.dayStartHour, user.settings.timeZone);
+    if (normalizedDate === today && existingIndex === -1) {
+      const nextUser = {
+        ...user,
+        stats: {
+          ...user.stats,
+          fitCoins: user.stats.fitCoins + weightRewardCoins,
+        },
+      };
+      setUser(nextUser);
+      userRepository.set(nextUser);
+    }
+
+    setAnalytics(nextAnalytics);
+    analyticsRepository.set(nextAnalytics);
+  }, [analytics, user, weightRewardCoins]);
+
   return (
     <div className="bg-slate-900 min-h-screen font-sans text-slate-100 selection:bg-indigo-500 selection:text-white">
       {/* Level Up Overlay */}
@@ -637,7 +709,14 @@ const App: React.FC = () => {
           />
         )}
         {view === ViewState.STATS && (
-          <Stats analytics={analytics} userStats={user.stats} sessionsPerDay={sessionsPerDay} />
+          <Stats
+            analytics={analytics}
+            user={user}
+            userStats={user.stats}
+            sessionsPerDay={sessionsPerDay}
+            weightRewardCoins={weightRewardCoins}
+            onLogWeight={handleLogWeight}
+          />
         )}
         {view === ViewState.PROFILE && (
           <Profile
@@ -645,6 +724,7 @@ const App: React.FC = () => {
             onUpdateSessionsPerDay={handleUpdateSessionsPerDay}
             onUpdateDayStartHour={handleUpdateDayStartHour}
             onUpdateTimeZone={handleUpdateTimeZone}
+            onUpdateHealthProfile={handleUpdateHealthProfile}
           />
         )}
         {view === ViewState.CLAN && (

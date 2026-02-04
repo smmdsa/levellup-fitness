@@ -4,7 +4,7 @@ import type { DataStore } from './storage/DataStore';
 import { BaseRepository } from './BaseRepository';
 
 const USER_KEY = 'levelup_user';
-const USER_VERSION = 3;
+const USER_VERSION = 4;
 
 const createUserId = () => {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
@@ -20,6 +20,9 @@ export const createDefaultUser = (): User => ({
     username: 'Rookie',
     avatarUrl: 'https://picsum.photos/200',
     createdAt: new Date().toISOString(),
+    heightCm: null,
+    sex: null,
+    birthDate: null,
   },
   stats: {
     level: 1,
@@ -74,6 +77,17 @@ export class UserRepository extends BaseRepository<User> {
         const profileId = typeof legacy?.profile?.id === 'string' && legacy.profile.id.trim().length > 0
           ? legacy.profile.id
           : fallback.profile.id;
+        const heightCmRaw = legacy?.profile?.heightCm;
+        const heightCm = Number.isFinite(heightCmRaw) && (heightCmRaw as number) > 0
+          ? Math.round(heightCmRaw as number)
+          : fallback.profile.heightCm;
+        const sexRaw = legacy?.profile?.sex;
+        const sex = sexRaw === 'male' || sexRaw === 'female' || sexRaw === 'other'
+          ? sexRaw
+          : fallback.profile.sex;
+        const birthDate = typeof legacy?.profile?.birthDate === 'string'
+          ? legacy.profile.birthDate
+          : fallback.profile.birthDate;
         const clanStatus = legacy?.clan?.status;
         const clanId = typeof legacy?.clan?.clanId === 'string' ? legacy.clan.clanId : null;
         const invitedClanId = typeof legacy?.clan?.invitedClanId === 'string' ? legacy.clan.invitedClanId : null;
@@ -89,6 +103,9 @@ export class UserRepository extends BaseRepository<User> {
             ...fallback.profile,
             ...legacy.profile,
             id: profileId,
+            heightCm,
+            sex,
+            birthDate,
           },
           stats: {
             ...fallback.stats,
